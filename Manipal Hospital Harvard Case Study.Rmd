@@ -22,7 +22,7 @@ options(tinytex.verbose = TRUE)
 
 ```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
 
-setwd("C:/Users/shahv/OneDrive/Desktop/MSBA/IDS 572/Assignments/Assignment_4")
+setwd("yourpath")
 library(naniar)
 library(SmartEDA)
 library(readr)
@@ -482,59 +482,3 @@ Accuracy_AB_SMOTE_MC
 ## **Part 9**
 
 ## According to us, the balanced data using SMOTE and applying the random forest will give us the best measure of success. And using that model, these variables are the highest influencing variables in our prediction of our NPS_Score:- CE_VALUEFORMONEY, EM_IMMEDIATEATTENTION, Estimatedcost,  Department, BedCategory, AgeYrs, LengthofStay  
-
-
-\newpage
-# Question 2:
-## **Part a**
-```{r echo=FALSE}
-
-include_graphics("Q2_1.png")
-
-```
-
-## Since C i.e. our cost of missclassification is too large, we can't afford any misclassiffcation. We will choose a parabola such that there is no training error that will be the one with the minimum curvature.
-
-## **Part b**
-```{r echo=FALSE}
-
-include_graphics("Q2_2.jpg")
-
-```
-
-## Since the cost of mis-classification is too small, the decision boundary will be linear.
-
-
-## **Part c**
-
-## Overfitting. If we use a 5-degree kernel, which is a very complex model , it will definitely overfit the training data. So any new point has a high chance of being miss-classified as we use soft-margin.
-
-\newpage
-# Question 3:
-
-## **Part a**
-```{r echo=FALSE}
-
-include_graphics("Q3_a.jpg")
-
-```
-
-
-## **Part b**
-
-```{r echo=FALSE}
-
-include_graphics("Q3_a_2.jpg")
-
-```
-
-```{r echo=FALSE}
-
-include_graphics("Q3_a_3.jpg")
-
-```
-
-
-## **Part c**
-
-# The optimal margin increases when we remove the support vectors (1, 0) or (1, 1) and stays the same when we remove the other two support vectors (2, 0) or (0, 1).
