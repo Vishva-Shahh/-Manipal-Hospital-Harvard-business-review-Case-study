@@ -1,0 +1,540 @@
+---
+title: "Manipal Hosptial Harvard business review Case study "
+author: 'Vishva Shah'
+date: "27/11/2019"
+output:
+  pdf_document: 
+    fig_crop: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(tinytex.verbose = TRUE)
+```
+
+# Question 1:
+
+## **Part 1**
+
+# Initially Manipal was facing the issue of gathering and collaborating the User feedback in a structured format. This was overcome by introducing NPS as a useful strategy to help convert the business problem into analytical problem to predict the best possible solution. Through NPS, Manipal could capture various parameters from user data to predict the overall score of the service provided by them. Based on analysing these behavioural results, Manipal could implement new strategies and improvements required in their business.
+
+## **Part 2**
+
+```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+
+setwd("C:/Users/shahv/OneDrive/Desktop/MSBA/IDS 572/Assignments/Assignment_4")
+library(naniar)
+library(SmartEDA)
+library(readr)
+library(randomForest)
+library(zoo)
+library(mice)
+library(e1071)
+library(dplyr)
+library(tidyr)
+library(factoextra)
+library(PCAmixdata)
+library(caret)
+library(glmnet)
+library(brglm2)
+library(readxl)
+library(class)
+library(gmodels)
+library(MASS)
+library(logistf)
+library(fastAdaboost)
+library(adabag)
+library(ROSE)
+library(DMwR)
+library(caret)
+library(knitr)
+
+set.seed(1234)
+
+```
+
+
+```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+
+
+Train_BD = read_excel("IMB651-XLS-ENG.xlsx", sheet = "Training Data or Binary Class")
+
+Test_BD = read_excel("IMB651-XLS-ENG.xlsx", sheet = "Test Data for Binary Class")
+
+Train_MD = read_excel("IMB651-XLS-ENG.xlsx", sheet = "Training Data for Multi-Class M")
+
+Test_MD = read_excel("IMB651-XLS-ENG.xlsx", sheet = "Test Data for Multi-Class Model")
+
+Data_BD = rbind.data.frame(Train_BD, Test_BD)
+
+Data_MD = rbind.data.frame(Train_MD, Test_MD)
+
+Data_Multi = rbind.data.frame(Train_MD, Test_MD)
+
+```
+
+```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+
+Data_MD[,13:47] = lapply(Data_MD[,13:47],function(x) factor(x, levels = 1:4, ordered = T))
+
+Data_MD = Data_MD %>%
+  mutate_if(is.character, as.factor)
+
+Data_MD$CE_NPS = factor(Data_MD$CE_NPS,levels = 0:10 ,ordered = T)
+
+Data_MD = Data_MD[,-which(names(Data_MD) %in% c("AdmissionDate" ,"DischargeDate"))]
+
+Data_MD$NPS_Status = as.factor(ifelse(Data_MD$NPS_Status %in% c("Passive", "Promotor"), 0, 1))
+
+Data_BD[,13:47] = lapply(Data_BD[,13:47],function(x) factor(x, levels = 1:4, ordered = T))
+
+Data_BD = Data_BD %>%
+  mutate_if(is.character, as.factor)
+
+Data_BD$CE_NPS = factor(Data_BD$CE_NPS,levels = 0:10 ,ordered = T)
+
+Data_BD$CE_NPS = as.factor(Data_BD$CE_NPS)
+
+Data_BD = Data_BD[,-which(names(Data_BD) %in% c("AdmissionDate" ,"DischargeDate"))]
+
+Data_New = Data_MD[,-c(1,2)]
+
+split(names(Data_New),sapply(Data_New, function(x) paste(class(x), collapse=" ")))
+
+```
+
+```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+
+ExpData(Data_BD,1)
+
+ExpData(Data_MD,1)
+
+sum(is.na(Data_BD))
+
+sum(is.na(Data_MD))
+
+```
+
+## There are no missing values in the dataset.
+
+## **Part 3**
+```{r echo=FALSE}
+
+include_graphics("Q1_3_1.jpg")
+
+```
+
+## **Part 4**
+```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+
+Index = sample(2, nrow(Data_New), replace = T, prob = c(0.8,0.2))
+
+Train = Data_New[Index == 1,]
+
+Test = Data_New[Index == 2,]
+
+options(scipen = 99)
+
+Model_GLM_1 = glm(NPS_Status~. -CE_NPS, data = Train, 
+                  family = binomial, method = "detect_separation", linear_program = "dual")
+
+Model_GLM_1
+```
+
+# These are the variables that are leading to quasi-complete separation where the coefficients are Infinity:
+# CE_NPS, MaritalStatus, BedCategory, State, Country, DOC_TREATMENTEFFECTIVENESS, OVS_OVERALLSTAFFATTITUDE
+
+## **Part 5**
+
+# Orthogonal polynomial coding is a form of trend analysis in that it is looking for the linear, quadratic and cubic trends in the categorical variable. This type of coding system should be used only with an ordinal variable in which the levels are equally spaced.
+
+## **Part 6**
+
+```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+options(scipen = 99)
+
+Model_GLM = glm(NPS_Status~.-CE_NPS -MaritalStatus -BedCategory -State -Country -DOC_TREATMENTEFFECTIVENESS -OVS_OVERALLSTAFFATTITUDE, data = Train, family = binomial) 
+
+summary(Model_GLM)
+
+Model_GLM = step(Model_GLM)
+
+Y_Predict = ifelse(predict(Model_GLM, newdata = Test, type = "response") < 0.5 , 0, 1)
+
+mean(Y_Predict != Test$NPS_Status)^2
+
+Conf_Mat_LR = confusionMatrix(as.factor(Y_Predict), Test$NPS_Status)
+
+Accuracy_LR = Conf_Mat_LR$overall[1]
+
+Accuracy_LR
+```
+
+## We get Accuracy of `r Accuracy_LR` after using the step function on our multiclass data and removing the quasi-seprable variables.
+
+## **Part 7**
+```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+
+Data_BD = Data_BD[,-c(1,2)]
+
+Data_MD = Data_MD[,-c(1,2)]
+
+```
+
+# Random Forest and Ada-boost on Binary Claasification:
+
+```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+
+Index_BC = sample(2, nrow(Data_BD), replace = T, prob = c(0.8,0.2))
+
+Train_BC = as.data.frame(Data_BD[Index_BC == 1,-which(names(Data_BD) %in% "CE_NPS")])
+
+Test_BC = as.data.frame(Data_BD[Index_BC == 2,])
+
+Model_RF_BC = randomForest(NPS_Status~. -State -Country, data = Train_BC, mtry = 7, ntree = 1000, 
+                           importance = T, proximity = T, tuneRF = T)
+
+Model_RF_BC
+
+Y_Predict_BC_RF = predict(Model_RF_BC, newdata = Test_BC, type = "response")
+
+Conf_Mat_RF_BC = confusionMatrix(Test_BC$NPS_Status, Y_Predict_BC_RF)
+
+Accuracy_RF_BC = Conf_Mat_RF_BC$overall[1]
+
+Accuracy_RF_BC
+
+Model_Boost = adaboost(NPS_Status~., data = Train_BC, 10)
+
+Y_Predict_AB = predict(Model_Boost, newdata = Test_BC, type = "response")
+
+Conf_Mat_AB_BC = confusionMatrix(Test_BC$NPS_Status, Y_Predict_AB$class)
+
+Accuracy_AB_BC = Conf_Mat_AB_BC$overall[1]
+
+Accuracy_AB_BC
+```
+
+## We get Accuracy of `r Accuracy_RF_BC` accuracy with random forest and `r Accuracy_AB_BC` with Adaboost on our binary data.
+
+# Random Forest and Ada-boost on Multi Claasification:
+
+```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+
+Data_Multi[,13:47] = lapply(Data_Multi[,13:47],function(x) factor(x, levels = 1:4, ordered = T))
+
+Data_Multi = Data_Multi %>%
+  mutate_if(is.character, as.factor)
+
+Data_Multi$CE_NPS = factor(Data_Multi$CE_NPS,levels = 0:10 ,ordered = T)
+
+Data_Multi$CE_NPS = as.factor(Data_Multi$CE_NPS)
+
+Data_Multi = Data_Multi[,-which(names(Data_Multi) %in% c("AdmissionDate" ,"DischargeDate"))]
+
+Data_Multi = Data_Multi[,-c(1,2)]
+
+split(names(Data_Multi),sapply(Data_Multi, function(x) paste(class(x), collapse=" ")))
+
+Index_MC = sample(2, nrow(Data_Multi), replace = T, prob = c(0.8,0.2))
+
+Train_MC = as.data.frame(Data_Multi[Index_MC == 1,-which(names(Data_Multi) %in% c("CE_NPS", "State"))])
+
+Test_MC = as.data.frame(Data_Multi[Index_MC == 2,])
+
+Model_RF_MC = randomForest(NPS_Status~., data = Train_MC, mtry = sqrt(ncol(Train_MC)), ntree = 500, 
+                           nodesize = 5, importance = T, proximity = T)
+
+Model_RF_MC
+
+Y_Predict_RF_MC = predict(Model_RF_MC, newdata = Test_MC, type = "class")
+
+Conf_Mat_RF_MC = confusionMatrix(Test_MC$NPS_Status, Y_Predict_RF_MC)
+
+Accuracy_RF_MC = Conf_Mat_RF_MC$overall[1]
+
+Accuracy_RF_MC
+
+Model_AB_MC = boosting(NPS_Status~. , data = Train_MC, boos = TRUE)
+
+Y_Predict_AB_MC = predict(Model_AB_MC, newdata = Test_MC, type = "class")
+
+Conf_Mat_AB_MC = confusionMatrix(Test_MC$NPS_Status, as.factor(Y_Predict_AB_MC[["class"]]))
+
+Accuracy_AB_MC = Conf_Mat_AB_MC$overall[1]
+
+Accuracy_AB_MC
+
+```
+
+## We get about `r Accuracy_RF_MC` accuracy with random forest and `r Accuracy_AB_MC` on our Multiclass data. 
+
+## **Part 8**
+
+# Up Sampling, Down Sampling and SMOTE for Binary Data:
+
+# Random Forest and Ada-Boost and the sampled Data:
+
+```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+
+Train_UP_BC = upSample(x = Train_BC[, -ncol(Train_BC)],
+                     y = Train_BC$NPS_Status)
+
+Train_Down_BC = downSample(x = Train_BC[, -ncol(Train_BC)],
+                     y = Train_BC$NPS_Status)
+
+Test_UP_BC = upSample(x = Test_BC[, -ncol(Test_BC)],
+                     y = Test_BC$NPS_Status)
+
+Test_Down_BC = downSample(x = Test_BC[, -ncol(Test_BC)],
+                     y = Test_BC$NPS_Status)
+
+Train_SMOTE_BC = SMOTE(NPS_Status~., data  = Train_BC, k = 5)
+
+Train_SMOTE_BC = na.omit(Train_SMOTE_BC)
+
+Test_SMOTE_BC = SMOTE(NPS_Status~., data = Test_BC)
+
+Test_SMOTE_BC = na.omit(Test_SMOTE_BC)
+
+Model_RF_Down_BC = randomForest(Class~. -State -Country, data = Train_Down_BC, mtry = 7, ntree = 500, 
+                           importance = T, proximity = T, tuneRF = T)
+
+Model_RF_Down_BC
+
+Y_Predict_Down_BC_RF = predict(Model_RF_Down_BC, newdata = Test_Down_BC, type = "response")
+
+Conf_Mat_RF_Down_BC = confusionMatrix(Test_Down_BC$Class, as.factor(Y_Predict_Down_BC_RF))
+
+Accuracy_RF_Down_BC = Conf_Mat_RF_Down_BC$overall[1]
+
+Accuracy_RF_Down_BC
+
+Model_Boost_Down_BC = adaboost(Class~., data = Train_Down_BC, 10)
+
+Y_Predict_AB_Down_BC = predict(Model_Boost_Down_BC, newdata = Test_Down_BC, type = "response")
+
+Conf_Mat_AB_Down_BC = confusionMatrix(Test_Down_BC$Class, Y_Predict_AB_Down_BC$class)
+
+Accuracy_AB_Down_BC = Conf_Mat_AB_Down_BC$overall[1]
+
+Accuracy_AB_Down_BC
+
+
+Model_RF_UP_BC = randomForest(Class~. -State -Country, data = Train_UP_BC, mtry = 7, ntree = 500, 
+                           importance = T, proximity = T, tuneRF = T)
+
+Model_RF_UP_BC
+
+Y_Predict_UP_BC_RF = predict(Model_RF_UP_BC, newdata = Test_UP_BC, type = "response")
+
+Conf_Mat_RF_UP_BC = confusionMatrix(Test_UP_BC$Class, as.factor(Y_Predict_UP_BC_RF))
+
+Accuracy_RF_UP_BC = Conf_Mat_RF_UP_BC$overall[1]
+
+Accuracy_RF_UP_BC
+
+Model_Boost_UP_BC = adaboost(Class~., data = Train_UP_BC, 10)
+
+Y_Predict_AB_UP_BC = predict(Model_Boost_UP_BC, newdata = Test_UP_BC, type = "response")
+
+Conf_Mat_AB_UP_BC = confusionMatrix(Test_UP_BC$Class, Y_Predict_AB_UP_BC$class)
+
+Accuracy_AB_UP_BC = Conf_Mat_AB_UP_BC$overall[1]
+
+Accuracy_AB_UP_BC
+
+Model_RF_SMOTE_BC = randomForest(NPS_Status~. -State -Country, data = Train_SMOTE_BC, mtry = 7, ntree = 500, 
+                           importance = T, proximity = T, tuneRF = T)
+
+Model_RF_SMOTE_BC
+
+Y_Predict_SMOTE_BC_RF = predict(Model_RF_SMOTE_BC, newdata = Test_SMOTE_BC, type = "response")
+
+Conf_Mat_RF_SMOTE_BC = confusionMatrix(Test_SMOTE_BC$NPS_Status, Y_Predict_SMOTE_BC_RF)
+
+Accuracy_RF_SMOTE_BC = Conf_Mat_RF_SMOTE_BC$overall[1]
+
+Accuracy_RF_SMOTE_BC
+
+Model_Boost = adaboost(NPS_Status~., data = Train_SMOTE_BC, 10)
+
+Y_Predict_AB = predict(Model_Boost, newdata = Test_SMOTE_BC, type = "response")
+
+Conf_Mat_AB_SMOTE_BC = confusionMatrix(Test_SMOTE_BC$NPS_Status, Y_Predict_AB$class)
+
+Accuracy_AB_SMOTE_BC = Conf_Mat_AB_SMOTE_BC$overall[1]
+
+Accuracy_AB_SMOTE_BC
+
+```
+
+## We get Accuracy of `r Accuracy_RF_Down_BC` accuracy with random forest and `r Accuracy_AB_Down_BC` with Adaboost on our binary data with Down Sampling.
+
+## We get Accuracy of `r Accuracy_RF_UP_BC` accuracy with random forest and `r Accuracy_AB_UP_BC` with Adaboost on our binary data Up Sampling.
+
+## We get Accuracy of `r Accuracy_RF_SMOTE_BC` accuracy with random forest and `r Accuracy_AB_SMOTE_BC` with Adaboost on our binary data with SMOTE Sampling.
+
+# Up Sampling, Down Sampling and SMOTE for MultiClass Data: 
+
+# Random Forest and Ada-Boost and the sampled Data:
+
+```{r,tidy=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+
+Train_UP_MC = upSample(x = Train_MC[, -ncol(Train_MC)],
+                     y = Train_MC$NPS_Status)
+
+Train_Down_MC = downSample(x = Train_MC[, -ncol(Train_MC)],
+                     y = Train_MC$NPS_Status)
+
+Test_UP_MC = upSample(x = Test_MC[, -ncol(Test_MC)],
+                     y = Test_MC$NPS_Status)
+
+Test_Down_MC = downSample(x = Test_MC[, -ncol(Test_MC)],
+                     y = Test_MC$NPS_Status)
+
+Train_SMOTE_MC = SMOTE(NPS_Status~., data  = Train_MC, k = 5)
+
+Train_SMOTE_MC = na.omit(Train_SMOTE_MC)
+
+Test_SMOTE_MC = SMOTE(NPS_Status~., data = Test_MC)
+
+Test_SMOTE_MC = na.omit(Test_SMOTE_MC)
+
+Model_RF_Down_MC = randomForest(Class~. -Country, data = Train_Down_MC, mtry = 7, ntree = 500, 
+                           importance = T, proximity = T, tuneRF = T)
+
+Model_RF_Down_MC
+
+Y_Predict_Down_MC_RF = predict(Model_RF_Down_MC, newdata = Test_Down_MC, type = "class")
+
+Conf_Mat_RF_Down_MC = confusionMatrix(Test_Down_MC$Class, as.factor(Y_Predict_Down_MC_RF))
+
+Accuracy_RF_Down_MC = Conf_Mat_RF_Down_MC$overall[1]
+
+Accuracy_RF_Down_MC
+
+Model_Boost_Down_MC = boosting(Class~. , data = Train_Down_MC, boos = TRUE)
+
+Y_Predict_AB_Down_MC = predict(Model_Boost_Down_MC, newdata = Test_Down_MC, type = "class")
+
+Conf_Mat_AB_Down_MC = confusionMatrix(Test_Down_MC$Class, as.factor(Y_Predict_AB_Down_MC[["class"]]))
+
+Accuracy_AB_Down_MC = Conf_Mat_AB_Down_MC$overall[1]
+
+Accuracy_AB_Down_MC
+
+Model_RF_UP_MC = randomForest(Class~. -Country, data = Train_UP_MC, mtry = 7, ntree = 500, 
+                           importance = T, proximity = T, tuneRF = T)
+
+Model_RF_UP_MC
+
+Y_Predict_UP_MC_RF = predict(Model_RF_UP_MC, newdata = Test_UP_MC, type = "response")
+
+Conf_Mat_RF_UP_MC = confusionMatrix(Test_UP_MC$Class, as.factor(Y_Predict_UP_MC_RF))
+
+Accuracy_RF_UP_MC = Conf_Mat_RF_UP_MC$overall[1]
+
+Accuracy_RF_UP_MC
+
+Model_Boost_UP_MC = boosting(Class~. , data = Train_UP_MC, boos = TRUE)
+
+Y_Predict_AB_UP_MC = predict(Model_Boost_UP_MC, newdata = Test_UP_MC, type = "response")
+
+Conf_Mat_AB_UP_MC = confusionMatrix(Test_UP_MC$Class, as.factor(Y_Predict_AB_UP_MC$class))
+
+Accuracy_AB_UP_MC = Conf_Mat_AB_UP_MC$overall[1]
+
+Accuracy_AB_UP_MC
+
+Model_RF_SMOTE_MC = randomForest(NPS_Status~. -Country, data = Train_SMOTE_MC, mtry = 7, ntree = 500, 
+                           importance = T, proximity = T, tuneRF = T)
+
+Model_RF_SMOTE_MC
+
+Y_Predict_SMOTE_MC_RF = predict(Model_RF_SMOTE_MC, newdata = Test_SMOTE_MC, type = "response")
+
+Conf_Mat_RF_SMOTE_MC = confusionMatrix(Test_SMOTE_MC$NPS_Status, as.factor(Y_Predict_SMOTE_MC_RF))
+
+Accuracy_RF_SMOTE_MC = Conf_Mat_RF_SMOTE_MC$overall[1]
+
+Accuracy_RF_SMOTE_MC
+
+Model_Boost_SMOTE_MC = boosting(NPS_Status~. , data = Train_SMOTE_MC, boos = TRUE)
+
+Y_Predict_AB_SMOTE_MC = predict(Model_Boost_SMOTE_MC, newdata = Test_SMOTE_MC, type = "response")
+
+Conf_Mat_AB_SMOTE_MC = confusionMatrix(Test_SMOTE_MC$NPS_Status, as.factor(Y_Predict_AB_SMOTE_MC$class))
+
+Accuracy_AB_SMOTE_MC = Conf_Mat_AB_SMOTE_MC$overall[1]
+
+Accuracy_AB_SMOTE_MC
+
+
+```
+
+## We get Accuracy of `r Accuracy_RF_Down_MC` accuracy with random forest and `r Accuracy_AB_Down_MC` with Adaboost on our Multiclass data with Down Sampling.
+
+## We get Accuracy of `r Accuracy_RF_UP_MC` accuracy with random forest and `r Accuracy_AB_UP_MC` with Adaboost on our Multiclass data with Up Sampling.
+
+## We get Accuracy of `r Accuracy_RF_SMOTE_MC` accuracy with random forest and `r Accuracy_AB_SMOTE_MC` with Adaboost on our Multiclass data with SMOTE Sampling.
+
+## **Part 9**
+
+## According to us, the balanced data using SMOTE and applying the random forest will give us the best measure of success. And using that model, these variables are the highest influencing variables in our prediction of our NPS_Score:- CE_VALUEFORMONEY, EM_IMMEDIATEATTENTION, Estimatedcost,  Department, BedCategory, AgeYrs, LengthofStay  
+
+
+\newpage
+# Question 2:
+## **Part a**
+```{r echo=FALSE}
+
+include_graphics("Q2_1.png")
+
+```
+
+## Since C i.e. our cost of missclassification is too large, we can't afford any misclassiffcation. We will choose a parabola such that there is no training error that will be the one with the minimum curvature.
+
+## **Part b**
+```{r echo=FALSE}
+
+include_graphics("Q2_2.jpg")
+
+```
+
+## Since the cost of mis-classification is too small, the decision boundary will be linear.
+
+
+## **Part c**
+
+## Overfitting. If we use a 5-degree kernel, which is a very complex model , it will definitely overfit the training data. So any new point has a high chance of being miss-classified as we use soft-margin.
+
+\newpage
+# Question 3:
+
+## **Part a**
+```{r echo=FALSE}
+
+include_graphics("Q3_a.jpg")
+
+```
+
+
+## **Part b**
+
+```{r echo=FALSE}
+
+include_graphics("Q3_a_2.jpg")
+
+```
+
+```{r echo=FALSE}
+
+include_graphics("Q3_a_3.jpg")
+
+```
+
+
+## **Part c**
+
+# The optimal margin increases when we remove the support vectors (1, 0) or (1, 1) and stays the same when we remove the other two support vectors (2, 0) or (0, 1).
